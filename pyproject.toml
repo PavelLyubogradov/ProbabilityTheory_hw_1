@@ -1,0 +1,11 @@
+[project]
+name = "probabilitytheory"
+version = "0.1.0"
+requires-python = ">=3.12.10"
+dependencies = [
+    "matplotlib>=3.11.2",
+    "numpy>=2.5.3",
+    "pandas>=3.0.6",
+    "pyqt6>=6.11.0",
+    "scikit-learn>=1.9.1",
+]

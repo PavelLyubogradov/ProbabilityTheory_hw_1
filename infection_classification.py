@@ -1,26 +1,27 @@
-"""Классификация заражения с помощью категориального Наивного Байеса.
+"""Infection classification using categorical Naive Bayes.
 
-Задача 1.24: по признакам результата теста (Test) и возрастной группы
-(Age_Group) предсказать статус заражения (Status: Infected /
-Not_infected). Используется sklearn.naive_bayes.CategoricalNB, так как
-оба признака являются категориальными.
+Problem 1.24: given the test result (Test) and the age group
+(Age_Group), predict the infection status (Status: Infected /
+Not_infected). sklearn.naive_bayes.CategoricalNB is used because both
+features are categorical.
 
-Запуск:
+Usage:
     python disease_naive_bayes.py
 
-Данные загружаются напрямую с Google Drive по ссылке DATA_PATH
-(файл dataset_diseases.csv, см. DATA_FILE_ID); отдельно скачивать
-файл и класть его рядом со скриптом не требуется, нужен только
-доступ в интернет. 
+The data is downloaded directly from Google Drive via the DATA_PATH
+link (file dataset_diseases.csv, see DATA_FILE_ID); there is no need
+to download the file separately and place it next to the script --
+only an internet connection is required.
 
-Архитектура модуля:
-    Вычислительные функции (load_data, encode_features, split_data,
-    train_model, compute_metrics, predict_all_combinations) не имеют
-    побочных эффектов (не печатают и не рисуют) и возвращают только
-    данные. Весь вывод в консоль и построение графиков вынесены в
-    отдельные функции (print_*, plot_*), чтобы вычислительную часть
-    можно было переиспользовать (например, в тестах или в другом
-    скрипте) без лишнего текста и графиков на экране.
+Module architecture:
+    The computational functions (load_data, encode_features,
+    split_data, train_model, compute_metrics,
+    predict_all_combinations) have no side effects (they neither
+    print nor plot) and return only data. All console output and
+    plotting are factored out into separate functions (print_*,
+    plot_*) so that the computational part can be reused (e.g. in
+    tests or in another script) without unwanted text or plots
+    appearing on screen.
 """
 
 from __future__ import annotations
@@ -53,104 +54,105 @@ ALPHA = 1.0
 
 
 def load_data(path: str) -> pd.DataFrame:
-    """Загружает данные из локального файла или по URL.
+    """Loads the dataset from a local file or a URL.
 
-    Алгоритм:
-        1. Прочитать CSV-файл в DataFrame с помощью pandas.
-           pandas.read_csv одинаково умеет читать как локальный путь
-           на диске, так и прямую ссылку на скачивание (в нашем
-           случае — ссылку вида drive.google.com/uc?id=...): если
-           path начинается с http(s)://, pandas сам скачивает
-           содержимое и парсит его как CSV, не требуя отдельного
-           шага загрузки файла на диск.
-        2. Если чтение не удалось (нет сети, ссылка недоступна, файл
-           повреждён или сервер вернул не CSV, а HTML-страницу —
-           например, страницу входа в Google), перехватить ошибку и
-           поднять её заново с понятным, человекочитаемым сообщением
-           вместо низкоуровневой трассировки pandas/urllib.
+    Algorithm:
+        1. Read the CSV file into a DataFrame with pandas.
+           pandas.read_csv can read a local disk path and a direct
+           download link (here, a drive.google.com/uc?id=... URL)
+           equally well: if path starts with http(s)://, pandas
+           downloads the content itself and parses it as CSV, with
+           no separate file-download step required.
+        2. If reading fails (no network connection, the link is
+           unreachable, the file is corrupted, or the server
+           returned an HTML page instead of CSV -- e.g. a Google
+           sign-in page), catch the error and re-raise it with a
+           clear, human-readable message instead of a low-level
+           pandas/urllib traceback.
 
     Args:
-        path: Путь или URL к CSV-файлу с данными. По умолчанию это
-            прямая ссылка на скачивание с Google Drive (DATA_PATH),
-            но может быть и локальный путь к уже скачанному файлу
-            dataset_diseases.csv.
+        path: Path or URL to the CSV file with the data. By default
+            this is a direct Google Drive download link (DATA_PATH),
+            but it can also be a local path to an already downloaded
+            dataset_diseases.csv file.
 
     Returns:
-        Таблица с исходными (ещё не закодированными) данными.
+        A table with the raw (not yet encoded) data.
 
     Raises:
-        RuntimeError: Если файл не удалось загрузить или прочитать
-            как корректный CSV.
+        RuntimeError: If the file could not be downloaded or parsed
+            as a valid CSV.
     """
     try:
         return pd.read_csv(path)
-    except Exception as error:  # noqa: BLE001 - любая ошибка чтения
+    except Exception as error:  # noqa: BLE001 - any read error
         raise RuntimeError(
-            f"Не удалось загрузить данные из {path!r}. Проверьте "
-            "подключение к интернету, доступность ссылки (файл на "
-            "Google Drive должен быть открыт по ссылке на просмотр) "
-            "и формат файла (ожидается CSV). "
-            f"Исходная ошибка: {error}"
+            f"Failed to load data from {path!r}. Please check your "
+            "internet connection, the accessibility of the link "
+            "(the file on Google Drive must be shared with "
+            "\"Anyone with the link\"), and the file format "
+            f"(CSV is expected). Original error: {error}"
         ) from error
 
 
 def print_data_summary(data: pd.DataFrame) -> None:
-    """Печатает краткую сводку по загруженному набору данных.
+    """Prints a brief summary of the loaded dataset.
 
     Args:
-        data: Таблица с исходными данными (результат load_data).
+        data: Table with the raw data (the result of load_data).
 
     Returns:
-        None. Сводка выводится в консоль.
+        None. The summary is printed to the console.
     """
-    print("Размер датасета:", data.shape)
-    print("\nКоличество объектов по классам:")
+    print("Dataset shape:", data.shape)
+    print("\nNumber of objects per class:")
     print(data[TARGET_COLUMN].value_counts())
-    print("\nПервые строки датасета:")
+    print("\nFirst rows of the dataset:")
     print(data.head())
 
 
 def encode_features(
     data: pd.DataFrame,
 ) -> tuple[np.ndarray, np.ndarray, OrdinalEncoder, OrdinalEncoder]:
-    """Кодирует категориальные признаки и целевую переменную в числа.
+    """Encodes the categorical features and the target as integers.
 
-    CategoricalNB требует целочисленного кодирования категорий, а не
-    строк, поэтому признаки и целевая переменная кодируются отдельными
-    OrdinalEncoder, чтобы потом можно было декодировать предсказания
-    обратно в текстовые метки.
+    CategoricalNB requires integer-encoded categories rather than
+    strings, so the features and the target are encoded with
+    separate OrdinalEncoder instances, so predictions can later be
+    decoded back into text labels.
 
-    Алгоритм:
-        1. Создать отдельный OrdinalEncoder для признаков (Test,
-           Age_Group) и обучить его методом fit_transform на столбцах
-           FEATURE_COLUMNS — энкодер сам находит уникальные категории
-           по каждому столбцу и присваивает им целые коды (0, 1, ...).
-           Эти коды произвольны и не означают порядок (CategoricalNB
-           использует их только как метки категорий, а не как числа
-           со смыслом "больше/меньше").
-        2. Создать второй, независимый OrdinalEncoder для целевой
-           переменной (Status) и обучить его на столбце
-           TARGET_COLUMN; .ravel() превращает результат из матрицы
-           формы (n, 1) в плоский вектор формы (n,), как ожидает
-           sklearn для y.
-        3. Два энкодера держатся раздельно умышленно: энкодер
-           признаков и энкодер цели кодируют разные по смыслу данные,
-           и впоследствии target_encoder понадобится отдельно, чтобы
-           декодировать предсказанные классы обратно в строки
-           ("Infected"/"Not_infected").
+    Algorithm:
+        1. Create a separate OrdinalEncoder for the features (Test,
+           Age_Group) and fit it with fit_transform on the
+           FEATURE_COLUMNS columns -- the encoder finds the unique
+           categories in each column itself and assigns them integer
+           codes (0, 1, ...). These codes are arbitrary and carry no
+           ordering (CategoricalNB uses them purely as category
+           labels, not as numbers with a "greater/less" meaning).
+        2. Create a second, independent OrdinalEncoder for the
+           target (Status) and fit it on the TARGET_COLUMN column;
+           .ravel() turns the result from a matrix of shape (n, 1)
+           into a flat vector of shape (n,), as sklearn expects for
+           y.
+        3. The two encoders are kept separate on purpose: the
+           feature encoder and the target encoder encode
+           semantically different data, and target_encoder will
+           later be needed on its own to decode predicted classes
+           back into strings ("Infected"/"Not_infected").
 
     Args:
-        data: Исходная таблица с признаками FEATURE_COLUMNS и целевой
-            переменной TARGET_COLUMN в виде строковых категорий.
+        data: The raw table with the FEATURE_COLUMNS features and
+            the TARGET_COLUMN target as string categories.
 
     Returns:
-        Кортеж из четырёх элементов:
-            encoded_features: Матрица признаков после кодирования.
-            encoded_target: Вектор закодированной целевой переменной.
-            feature_encoder: Обученный OrdinalEncoder для признаков,
-                хранит исходные категории в ``categories_``.
-            target_encoder: Обученный OrdinalEncoder для целевой
-                переменной, нужен для обратного декодирования меток.
+        A tuple of four elements:
+            encoded_features: The feature matrix after encoding.
+            encoded_target: The encoded target vector.
+            feature_encoder: The fitted OrdinalEncoder for the
+                features, storing the original categories in
+                ``categories_``.
+            target_encoder: The fitted OrdinalEncoder for the
+                target, needed to decode labels back later.
     """
     feature_encoder = OrdinalEncoder()
     encoded_features = feature_encoder.fit_transform(
@@ -169,56 +171,57 @@ def print_encoding_summary(
     feature_encoder: OrdinalEncoder,
     target_encoder: OrdinalEncoder,
 ) -> None:
-    """Печатает категории, обнаруженные энкодерами при обучении.
+    """Prints the categories discovered by the encoders during fitting.
 
-    Полезно как проверка того, что кодирование прошло ожидаемо —
-    например, что в данных нет опечаток вроде "young"/"Young",
-    которые энкодер воспримет как разные категории.
+    Useful as a sanity check that encoding went as expected -- for
+    instance, that the data contains no typos such as
+    "young"/"Young", which the encoder would treat as different
+    categories.
 
     Args:
-        feature_encoder: Энкодер, обученный на столбцах FEATURE_COLUMNS.
-        target_encoder: Энкодер, обученный на столбце TARGET_COLUMN.
+        feature_encoder: Encoder fitted on the FEATURE_COLUMNS columns.
+        target_encoder: Encoder fitted on the TARGET_COLUMN column.
 
     Returns:
-        None. Сводка выводится в консоль.
+        None. The summary is printed to the console.
     """
-    print("\nКатегории признака Test:", feature_encoder.categories_[0])
-    print("Категории признака Age_Group:", feature_encoder.categories_[1])
-    print("Категории целевой переменной:", target_encoder.categories_[0])
+    print("\nCategories of the Test feature:", feature_encoder.categories_[0])
+    print("Categories of the Age_Group feature:", feature_encoder.categories_[1])
+    print("Categories of the target variable:", target_encoder.categories_[0])
 
 
 def split_data(
     features: np.ndarray,
     target: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Разбивает данные на обучающую и тестовую выборки.
+    """Splits the data into training and test sets.
 
-    Использует стратификацию по целевой переменной (stratify=target),
-    чтобы доля классов Infected/Not_infected была одинаковой в train
-    и test.
+    Uses stratification on the target (stratify=target), so that
+    the proportion of Infected/Not_infected is the same in the
+    training and test sets.
 
-    Алгоритм:
-        1. Вызвать train_test_split из sklearn, передав закодированные
-           признаки и целевую переменную.
-        2. Указать test_size=TEST_SIZE (0.25) — четверть данных уходит
-           в тестовую выборку, три четверти остаются для обучения.
-        3. Указать stratify=target — train_test_split сначала
-           группирует объекты по значению целевой переменной, а затем
-           отбирает test_size от каждой группы отдельно. Это
-           гарантирует, что соотношение Infected/Not_infected в train
-           и test совпадает (приблизительно) с соотношением в полном
-           датасете, а не определяется случайно.
-        4. Зафиксировать random_state=RANDOM_STATE — делает разбиение
-           воспроизводимым: при повторном запуске с тем же значением
-           получится то же самое разбиение на train/test.
+    Algorithm:
+        1. Call train_test_split from sklearn, passing the encoded
+           features and target.
+        2. Set test_size=TEST_SIZE (0.25) -- a quarter of the data
+           goes to the test set, three quarters remain for training.
+        3. Set stratify=target -- train_test_split first groups the
+           objects by the value of the target and then draws
+           test_size from each group separately. This guarantees
+           that the Infected/Not_infected ratio in train and test
+           (approximately) matches the ratio in the full dataset,
+           rather than being left to chance.
+        4. Fix random_state=RANDOM_STATE -- makes the split
+           reproducible: running the script again with the same
+           value produces the same train/test split.
 
     Args:
-        features: Матрица закодированных признаков.
-        target: Вектор закодированной целевой переменной.
+        features: Matrix of encoded features.
+        target: Vector of the encoded target.
 
     Returns:
-        Кортеж ``(x_train, x_test, y_train, y_test)`` — обучающая и
-        тестовая части признаков и целевой переменной.
+        A tuple ``(x_train, x_test, y_train, y_test)`` -- the
+        training and test parts of the features and the target.
     """
     return train_test_split(
         features,
@@ -233,34 +236,34 @@ def train_model(
     x_train: np.ndarray,
     y_train: np.ndarray,
 ) -> CategoricalNB:
-    """Обучает CategoricalNB со сглаживанием Лапласа alpha=ALPHA.
+    """Trains CategoricalNB with Laplace smoothing alpha=ALPHA.
 
-    Алгоритм:
-        1. Создать объект CategoricalNB с параметром alpha=ALPHA.
-           Alpha — параметр сглаживания Лапласа: он добавляет
-           небольшую "виртуальную" добавку к счётчикам встречаемости
-           каждой комбинации (признак, значение, класс), чтобы
-           комбинации, которых не было в обучающей выборке, не
-           получали нулевую (и тем самым "обнуляющую" всё
-           произведение) вероятность при классификации новых
-           объектов.
-        2. Вызвать model.fit(x_train, y_train). Внутри sklearn для
-           каждого признака и каждого класса считает условные
-           вероятности P(значение_признака | класс) на основе частот
-           встречаемости в обучающих данных, а также априорные
-           вероятности классов P(класс) = доля объектов этого класса
-           в train. Именно эти вероятности затем перемножаются (по
-           "наивному" предположению о независимости признаков при
-           фиксированном классе) для получения предсказаний.
-        3. Вернуть обученный объект model, готовый к вызовам predict
-           и predict_proba.
+    Algorithm:
+        1. Create a CategoricalNB object with the alpha=ALPHA
+           parameter. Alpha is the Laplace smoothing parameter: it
+           adds a small "virtual" count to the occurrence counts of
+           every (feature, value, class) combination, so that
+           combinations absent from the training set do not receive
+           a zero (and thus product-nullifying) probability when
+           classifying new objects.
+        2. Call model.fit(x_train, y_train). Internally, sklearn
+           computes, for every feature and every class, the
+           conditional probabilities P(feature value | class) from
+           the occurrence frequencies in the training data, as well
+           as the prior class probabilities P(class) = the
+           proportion of objects of that class in train. These
+           probabilities are then multiplied together (under the
+           "naive" assumption of feature independence given the
+           class) to obtain predictions.
+        3. Return the fitted model object, ready for calls to
+           predict and predict_proba.
 
     Args:
-        x_train: Закодированные признаки обучающей выборки.
-        y_train: Закодированная целевая переменная обучающей выборки.
+        x_train: Encoded features of the training set.
+        y_train: Encoded target of the training set.
 
     Returns:
-        Обученная модель CategoricalNB.
+        The fitted CategoricalNB model.
     """
     model = CategoricalNB(alpha=ALPHA)
     model.fit(x_train, y_train)
@@ -273,48 +276,49 @@ def compute_metrics(
     y_test: np.ndarray,
     target_encoder: OrdinalEncoder,
 ) -> dict[str, float | np.ndarray]:
-    """Вычисляет метрики качества модели на тестовой выборке.
+    """Computes quality metrics for the model on the test set.
 
-    Чистая функция без побочных эффектов: только считает и
-    возвращает значения, не печатает и не рисует графики — это
-    позволяет переиспользовать её (например, сравнивать метрики
-    нескольких моделей или логировать их в файл) без лишнего вывода.
+    A pure function with no side effects: it only computes and
+    returns values, it neither prints nor plots -- this allows the
+    function to be reused (e.g. to compare several models' metrics
+    or log them to a file) without unwanted output.
 
-    Алгоритм:
-        1. Получить предсказания модели на тестовой выборке:
-           y_pred = model.predict(x_test). Модель сравнивает
-           апостериорные вероятности классов для каждого объекта и
-           выбирает класс с максимальной вероятностью.
-        2. Определить числовой код класса POSITIVE_CLASS_LABEL
-           ("Infected") через target_encoder.categories_ — нужен,
-           чтобы явно указать sklearn, какой класс считать
-           "положительным" при расчёте precision/recall/F1 (иначе
-           эти метрики по умолчанию считались бы для другого класса).
-        3. Посчитать accuracy_score — долю верно классифицированных
-           объектов среди всех объектов теста.
-        4. Посчитать precision_score — долю истинных Infected среди
-           всех объектов, предсказанных моделью как Infected (то
-           есть насколько можно доверять положительному предсказанию
-           модели).
-        5. Посчитать recall_score — долю истинных Infected, которых
-           модель действительно нашла (то есть сколько реальных
-           случаев заражения не было пропущено).
-        6. Посчитать f1_score — гармоническое среднее precision и
-           recall, сбалансированная метрика, полезная при не совсем
-           равном соотношении классов.
-        7. Сложить все числовые метрики и вектор предсказаний y_pred
-           в один словарь и вернуть его.
+    Algorithm:
+        1. Obtain the model's predictions on the test set:
+           y_pred = model.predict(x_test). The model compares the
+           posterior class probabilities for each object and picks
+           the class with the highest probability.
+        2. Determine the integer code of the POSITIVE_CLASS_LABEL
+           class ("Infected") via target_encoder.categories_ -- this
+           is needed to explicitly tell sklearn which class to treat
+           as "positive" when computing precision/recall/F1
+           (otherwise these metrics would default to the other
+           class).
+        3. Compute accuracy_score -- the fraction of correctly
+           classified objects among all test objects.
+        4. Compute precision_score -- the fraction of true Infected
+           cases among all objects the model predicted as Infected
+           (i.e. how much the model's positive predictions can be
+           trusted).
+        5. Compute recall_score -- the fraction of true Infected
+           cases the model actually found (i.e. how many real
+           infection cases were not missed).
+        6. Compute f1_score -- the harmonic mean of precision and
+           recall, a balanced metric useful when the class ratio is
+           not perfectly even.
+        7. Pack all the numeric metrics and the y_pred prediction
+           vector into one dictionary and return it.
 
     Args:
-        model: Обученная модель CategoricalNB.
-        x_test: Закодированные признаки тестовой выборки.
-        y_test: Закодированная целевая переменная тестовой выборки.
-        target_encoder: Encoder, использованный для целевой
-            переменной; нужен, чтобы получить имена классов.
+        model: The fitted CategoricalNB model.
+        x_test: Encoded features of the test set.
+        y_test: Encoded target of the test set.
+        target_encoder: The encoder used for the target; needed to
+            obtain the class names.
 
     Returns:
-        Словарь с ключами "accuracy", "precision", "recall",
-        "f1" (числа) и "y_pred" (массив предсказанных классов).
+        A dictionary with the keys "accuracy", "precision", "recall",
+        "f1" (numbers) and "y_pred" (array of predicted classes).
     """
     y_pred = model.predict(x_test)
 
@@ -337,15 +341,15 @@ def print_metrics_report(
     y_test: np.ndarray,
     class_names: list[str],
 ) -> None:
-    """Печатает метрики качества и полный classification_report.
+    """Prints the quality metrics and the full classification_report.
 
     Args:
-        metrics: Словарь, возвращённый compute_metrics.
-        y_test: Закодированная целевая переменная тестовой выборки.
-        class_names: Имена классов в порядке их числовых кодов.
+        metrics: The dictionary returned by compute_metrics.
+        y_test: Encoded target of the test set.
+        class_names: Class names in the order of their integer codes.
 
     Returns:
-        None. Отчёт выводится в консоль.
+        None. The report is printed to the console.
     """
     print(f"\nAccuracy:  {metrics['accuracy']:.4f}")
     print(f"Precision: {metrics['precision']:.4f}")
@@ -368,22 +372,22 @@ def plot_confusion_matrix(
     y_pred: np.ndarray,
     class_names: list[str],
 ) -> None:
-    """Строит и показывает матрицу ошибок.
+    """Builds and displays the confusion matrix.
 
     Args:
-        y_test: Закодированная целевая переменная тестовой выборки.
-        y_pred: Предсказанные моделью классы (из compute_metrics).
-        class_names: Имена классов в порядке их числовых кодов.
+        y_test: Encoded target of the test set.
+        y_pred: Predicted classes from the model (from compute_metrics).
+        class_names: Class names in the order of their integer codes.
 
     Returns:
-        None. Строит график через matplotlib.
+        None. Draws a plot with matplotlib.
     """
     ConfusionMatrixDisplay.from_predictions(
         y_test,
         y_pred,
         display_labels=class_names,
     )
-    plt.title("CategoricalNB: матрица ошибок (diseases)")
+    plt.title("CategoricalNB: confusion matrix (diseases)")
     plt.show()
 
 
@@ -392,65 +396,66 @@ def predict_all_combinations(
     feature_encoder: OrdinalEncoder,
     target_encoder: OrdinalEncoder,
 ) -> pd.DataFrame:
-    """Строит прогноз и вероятности для всех комбинаций признаков.
+    """Builds predictions and probabilities for every feature combination.
 
-    Перебирает все сочетания категорий Test и Age_Group (аналогично
-    примеру Weather Play из шаблона курса) и показывает, какие
-    апостериорные вероятности и итоговый класс даёт модель для
-    каждого из них.
+    Enumerates all combinations of the Test and Age_Group categories
+    (similar to the Weather Play example from the course template)
+    and shows the posterior probabilities and the final class the
+    model assigns to each of them.
 
-    Алгоритм:
-        1. Взять из feature_encoder.categories_ списки всех исходных
-           категорий для Test (Positive/Negative) и Age_Group
-           (Young/Old) — именно те категории, которые энкодер
-           "увидел" при обучении.
-        2. Сформировать DataFrame all_cases со всеми возможными
-           парами (Test, Age_Group) через декартово произведение
-           (вложенный перебор: для каждого значения test — для
-           каждого значения age) — получится 2 × 2 = 4 строки, по
-           одной на каждую комбинацию признаков.
-        3. Определить числовые коды "положительного" и
-           "отрицательного" классов (Infected / Not_infected) через
-           target_encoder, чтобы корректно подписать столбцы с
-           вероятностями. Функция рассчитана ровно на два класса.
-        4. Закодировать all_cases тем же feature_encoder, что
-           использовался при обучении (только transform, без
-           повторного fit) — это гарантирует, что строки "Positive",
-           "Young" и т.д. превратятся в те же числовые коды, что и
-           при обучении модели.
-        5. Получить от модели predict_proba — для каждой из 4
-           комбинаций это вектор из двух чисел: апостериорная
-           вероятность класса Not_infected и класса Infected (они в
-           сумме дают 1 для каждой строки).
-        6. Получить predict — итоговый класс, который модель выбрала
-           бы для каждой комбинации (класс с максимальной
-           вероятностью из шага 5).
-        7. Собрать результат в таблицу: исходные категории признаков,
-           столбцы с вероятностями P(Not_infected) и P(Infected), и
-           столбец с декодированным обратно в текст предсказанием
-           (через target_encoder.inverse_transform).
+    Algorithm:
+        1. Take, from feature_encoder.categories_, the lists of all
+           original categories for Test (Positive/Negative) and
+           Age_Group (Young/Old) -- exactly the categories the
+           encoder "saw" during fitting.
+        2. Build a DataFrame all_cases with every possible pair
+           (Test, Age_Group) via a Cartesian product (a nested loop:
+           for each value of test -- for each value of age) --
+           giving 2 x 2 = 4 rows, one per feature combination.
+        3. Determine the integer codes of the "positive" and
+           "negative" classes (Infected / Not_infected) via
+           target_encoder, in order to label the probability columns
+           correctly. The function is designed for exactly two
+           classes.
+        4. Encode all_cases with the same feature_encoder used
+           during training (transform only, no re-fitting) -- this
+           guarantees that strings such as "Positive", "Young", etc.
+           turn into the same integer codes used when the model was
+           trained.
+        5. Obtain predict_proba from the model -- for each of the 4
+           combinations this is a vector of two numbers: the
+           posterior probability of the Not_infected class and of
+           the Infected class (they sum to 1 for each row).
+        6. Obtain predict -- the final class the model would choose
+           for each combination (the class with the highest
+           probability from step 5).
+        7. Assemble the result into a table: the original feature
+           categories, columns with the P(Not_infected) and
+           P(Infected) probabilities, and a column with the
+           prediction decoded back to text (via
+           target_encoder.inverse_transform).
 
     Args:
-        model: Обученная модель CategoricalNB.
-        feature_encoder: Encoder, использованный для признаков; из
-            его ``categories_`` берутся все возможные значения.
-        target_encoder: Encoder, использованный для целевой
-            переменной; нужен для имён классов и декодирования
-            предсказаний обратно в текстовые метки.
+        model: The fitted CategoricalNB model.
+        feature_encoder: The encoder used for the features; its
+            ``categories_`` give all possible values.
+        target_encoder: The encoder used for the target; needed for
+            the class names and to decode predictions back to text
+            labels.
 
     Returns:
-        Таблица со всеми комбинациями признаков, вероятностями по
-        каждому классу и итоговым прогнозом модели.
+        A table with every feature combination, the probability of
+        each class, and the model's final prediction.
 
     Raises:
-        ValueError: Если целевая переменная содержит не ровно два
-            класса (функция рассчитана только на бинарный случай).
+        ValueError: If the target has a number of classes other than
+            two (the function is designed for the binary case only).
     """
     class_names = list(target_encoder.categories_[0])
     if len(class_names) != 2:
         raise ValueError(
-            "predict_all_combinations поддерживает только бинарную "
-            f"целевую переменную, но найдено классов: {class_names}"
+            "predict_all_combinations only supports a binary target, "
+            f"but found classes: {class_names}"
         )
 
     test_values = feature_encoder.categories_[0]
@@ -483,27 +488,26 @@ def predict_all_combinations(
 
 
 def main() -> None:
-    """Запускает полный поцесс: данные -> обучение -> оценка.
+    """Runs the full pipeline: data -> training -> evaluation.
 
-    Алгоритм:
-        1. load_data — прочитать CSV (с понятной ошибкой при сбое
-           загрузки), print_data_summary — вывести сводку по данным.
-        2. encode_features — закодировать категориальные признаки и
-           целевую переменную в числовой вид, пригодный для
-           CategoricalNB; print_encoding_summary — показать найденные
-           категории.
-        3. split_data — разбить закодированные данные на обучающую и
-           тестовую выборки со стратификацией по классу.
-        4. train_model — обучить CategoricalNB на обучающей выборке.
-        5. compute_metrics — вычислить accuracy/precision/recall/F1 на
-           тестовой выборке; print_metrics_report и
-           plot_confusion_matrix — показать результаты.
-        6. predict_all_combinations — для наглядности показать
-           вероятности и прогноз модели по всем возможным сочетаниям
-           признаков, а не только по объектам теста.
+    Algorithm:
+        1. load_data -- read the CSV (with a clear error on failure),
+           print_data_summary -- print the data summary.
+        2. encode_features -- encode the categorical features and the
+           target as integers suitable for CategoricalNB;
+           print_encoding_summary -- show the discovered categories.
+        3. split_data -- split the encoded data into training and
+           test sets, stratified by class.
+        4. train_model -- fit CategoricalNB on the training set.
+        5. compute_metrics -- compute accuracy/precision/recall/F1 on
+           the test set; print_metrics_report and
+           plot_confusion_matrix -- display the results.
+        6. predict_all_combinations -- for illustration, show the
+           model's probabilities and prediction for every possible
+           feature combination, not just the test objects.
 
     Returns:
-        None. Все результаты выводятся в консоль и в виде графиков.
+        None. All results are printed to the console and plotted.
     """
     try:
         data = load_data(DATA_PATH)
@@ -519,8 +523,8 @@ def main() -> None:
     print_encoding_summary(feature_encoder, target_encoder)
 
     x_train, x_test, y_train, y_test = split_data(features, target)
-    print("\nРазмер train:", x_train.shape)
-    print("Размер test:", x_test.shape)
+    print("\nTrain set size:", x_train.shape)
+    print("Test set size:", x_test.shape)
 
     model = train_model(x_train, y_train)
 
@@ -532,9 +536,8 @@ def main() -> None:
     combinations = predict_all_combinations(
         model, feature_encoder, target_encoder
     )
-    print("\nПрогноз для всех комбинаций признаков:")
+    print("\nPredictions for every feature combination:")
     print(combinations.round(3))
-
 
 if __name__ == "__main__":
     main()
